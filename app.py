@@ -203,7 +203,7 @@ with st.expander("📊 Use Reverse Calculator", expanded=False):
         
         # Stock titer input
         stock_titer_mantissa = st.number_input(
-            "Stock Titer (mantissa)",
+            "Stock Titer",
             min_value=0.1,
             max_value=9.99,
             value=5.0,
@@ -225,7 +225,7 @@ with st.expander("📊 Use Reverse Calculator", expanded=False):
         st.subheader("Target Amount")
         
         target_pfu_mantissa = st.number_input(
-            "Target PFU (mantissa)",
+            "Target PFU",
             min_value=0.1,
             max_value=9.99,
             value=1.0,
