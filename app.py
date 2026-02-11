@@ -26,14 +26,27 @@ with col1:
     )
 
 with col2:
-    dilution = st.number_input(
+    # Create dilution options from 10^-1 to 10^-9
+    dilution_options = {
+        "10⁻¹ (0.1)": 10,
+        "10⁻² (0.01)": 100,
+        "10⁻³ (0.001)": 1000,
+        "10⁻⁴": 10000,
+        "10⁻⁵": 100000,
+        "10⁻⁶": 1000000,
+        "10⁻⁷": 10000000,
+        "10⁻⁸": 100000000,
+        "10⁻⁹": 1000000000
+    }
+    
+    dilution_label = st.selectbox(
         "Dilution Factor",
-        min_value=1,
-        value=1000000,
-        step=1,
-        format="%d",
-        help="e.g., 10⁶ = 1000000"
+        options=list(dilution_options.keys()),
+        index=5,  # Default to 10^-6
+        help="Select the dilution used for plating"
     )
+    
+    dilution = dilution_options[dilution_label]
 
 with col3:
     volume = st.number_input(
