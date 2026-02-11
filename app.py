@@ -8,11 +8,11 @@ st.set_page_config(
 )
 
 # Title and description
-st.title("PFU Titer Calculator")
+st.title("🦠 PFU Titer Calculator")
 st.markdown("Calculate viral titers from plaque assays with automatic countability checks")
 
 # Input section
-st.header("Input Data")
+st.header("Assay Data")
 
 col1, col2, col3 = st.columns(3)
 
@@ -57,6 +57,74 @@ with col3:
         help="Volume of inoculum plated"
     )
 
+# Experimental Details Section
+st.header("Experimental Details (for Methods)")
+
+col4, col5, col6 = st.columns(3)
+
+with col4:
+    cell_line = st.selectbox(
+        "Cell Line",
+        options=["MDCK-DP", "Vero", "BHK-21", "A549", "HEK293", "HEP-2", "HeLa"],
+        index=0,  # Default to MDCK-DP
+        help="Cell line used for the plaque assay"
+    )
+
+with col5:
+    # Incubation time in hours (2 days = 48h to 14 days = 336h)
+    incubation_options = {
+        "2 days (48h)": 48,
+        "3 days (72h)": 72,
+        "4 days (96h)": 96,
+        "5 days (120h)": 120,
+        "6 days (144h)": 144,
+        "7 days (168h)": 168,
+        "8 days (192h)": 192,
+        "9 days (216h)": 216,
+        "10 days (240h)": 240,
+        "11 days (264h)": 264,
+        "12 days (288h)": 288,
+        "13 days (312h)": 312,
+        "14 days (336h)": 336
+    }
+    
+    incubation_label = st.selectbox(
+        "Incubation Time",
+        options=list(incubation_options.keys()),
+        index=1,  # Default to 3 days
+        help="Time plates were incubated before counting"
+    )
+    
+    incubation_hours = incubation_options[incubation_label]
+    incubation_days = incubation_hours // 24
+
+with col6:
+    replicates = st.selectbox(
+        "Number of Replicates",
+        options=[1, 2, 3, 4, 5, 6],
+        index=1,  # Default to 2 replicates
+        help="Number of replicate wells plated"
+    )
+
+# Additional optional fields
+col7, col8 = st.columns(2)
+
+with col7:
+    plate_type = st.selectbox(
+        "Plate Type",
+        options=["6-well plate", "12-well plate", "24-well plate", "35mm dish", "60mm dish", "100mm dish"],
+        index=0,
+        help="Type of culture vessel used"
+    )
+
+with col8:
+    overlay_type = st.selectbox(
+        "Overlay Medium",
+        options=["Agar overlay", "Agarose overlay", "Methylcellulose overlay", "CMC overlay"],
+        index=0,
+        help="Type of overlay used to restrict viral spread"
+    )
+
 # Calculate button
 if st.button("Calculate PFU/mL", type="primary"):
     # Convert µL to mL
@@ -71,7 +139,7 @@ if st.button("Calculate PFU/mL", type="primary"):
     if plaques < 30:
         st.warning(f"⚠️ Plaque count ({plaques}) is below 30 - results may lack statistical reliability")
     elif plaques > 300:
-        st.warning(f"⚠️ Plaque count ({plaques}) is above 300 - plate may be too confluent for accurate counting, so flag as TOO MANY TOO COUNT")
+        st.warning(f"⚠️ Plaque count ({plaques}) is above 300 - plate may be too confluent for accurate counting")
     else:
         st.success("✅ Plaque count is within optimal range (30-300)")
     
@@ -98,9 +166,12 @@ if st.button("Calculate PFU/mL", type="primary"):
     else:
         exponent = 0
     
-    methods_text = f"""Viral titers were determined by plaque assay. Serial dilutions of virus stocks were prepared and {volume:.0f} µL of the 10^-{exponent} dilution was plated onto confluent cell monolayers. Plates were incubated until plaques were visible, fixed, and stained. Plaques were manually counted ({plaques} plaques) and titers were calculated as {pfu_ml:.2e} PFU/mL."""
+    # Build comprehensive methods paragraph
+    replicate_text = "in duplicate" if replicates == 2 else "in triplicate" if replicates == 3 else f"with {replicates} replicates" if replicates > 1 else ""
     
-    st.text_area("Copy for your methods:", methods_text, height=150)
+    methods_text = f"""Viral titers were determined by plaque assay on {cell_line} cells. Confluent cell monolayers in {plate_type}s were prepared 24 hours prior to infection. Serial 10-fold dilutions of virus stocks were prepared in infection medium, and {volume:.0f} µL of each dilution was inoculated onto the cells {replicate_text}. After 1 hour adsorption at 37°C with 5% CO₂, the inoculum was removed and cells were overlaid with {overlay_type.lower()}. Plates were incubated at 37°C with 5% CO₂ for {incubation_days} days ({incubation_hours} hours). Following incubation, cells were fixed with 4% formaldehyde and stained with 0.1% crystal violet to visualize plaques. Plaques from the 10⁻{exponent} dilution were manually counted ({plaques} plaques{'per well, averaged across replicates' if replicates > 1 else ''}), and viral titers were calculated as {titer_display}."""
+    
+    st.text_area("Copy for your methods:", methods_text, height=200)
     
 # Footer
 st.markdown("---")
