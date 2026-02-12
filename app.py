@@ -188,12 +188,12 @@ if st.button("Calculate PFU/mL", type="primary"):
         st.info("✓ Select all text below (Ctrl+A) and copy (Ctrl+C)")
         st.code(methods_text, language=None)
 
-# Reverse Calculator Section
+# Stock Titer Dilution Calculator Section
 st.markdown("---")
-st.header("🔄 Reverse Calculator")
+st.header("Reverse Calculator")
 st.markdown("*Plan your experiment: Calculate volume needed to achieve a target PFU amount*")
 
-with st.expander("📊 Use Reverse Calculator", expanded=False):
+with st.expander("📊 Use Stock Titer Dilution Calculator", expanded=False):
     st.markdown("**Scenario:** You know your stock titer and need to calculate how much volume to use")
     
     col_rev1, col_rev2 = st.columns(2)
