@@ -1,4 +1,4 @@
-# PFU Titer Calculator
+# Virology Calculator
 
 A Streamlit web application for calculating viral titers from plaque assays with automatic countability checks and methods section generation.
 
