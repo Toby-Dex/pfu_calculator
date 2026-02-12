@@ -3,7 +3,7 @@ import math
 
 # Page config
 st.set_page_config(
-    page_title="Viral Titer Calculator",
+    page_title="Viral Titer Toolkit",
     page_icon="🦠",
     layout="centered"
 )
@@ -13,7 +13,7 @@ st.title("🦠 Viral Titer Calculator")
 st.markdown("Professional calculators for virology research workflows")
 
 # Create tabs for different calculators
-tab1, tab2, tab3 = st.tabs(["🧮 PFU Calculator", "🔄 Stock Dilution Calculator", "🧬 TCID50 Calculator"])
+tab1, tab2, tab3 = st.tabs(["🧮 PFU Calculator", "🔄 Reverse Calculator", "🧬 TCID50 Calculator"])
 
 # ============================================================================
 # TAB 1: PFU TITER CALCULATOR
@@ -206,10 +206,10 @@ with tab1:
             st.code(methods_text, language=None)
 
 # ============================================================================
-# TAB 2: STOCK DILUTION CALCULATOR
+# TAB 2: REVERSE CALCULATOR
 # ============================================================================
 with tab2:
-    st.header("🔄 Stock Dilution Calculator")
+    st.header("🔄 Reverse Calculator")
     st.markdown("*Plan your experiment: Calculate volume needed to achieve a target PFU amount*")
     
     st.markdown("**Scenario:** You know your stock titer and need to calculate how much volume to use")
@@ -310,23 +310,318 @@ with tab2:
             """)
 
 # ============================================================================
-# TAB 3: TCID50 CALCULATOR (Placeholder)
+# TAB 3: TCID50 CALCULATOR
 # ============================================================================
 with tab3:
     st.header("🧬 TCID50 Calculator")
     st.markdown("Calculate 50% Tissue Culture Infectious Dose using Reed-Muench or Spearman-Karber methods")
     
-    st.info("🚧 TCID50 Calculator coming soon! This will support both Reed-Muench and Spearman-Karber calculations.")
+    # Method selection
+    calculation_method = st.radio(
+        "Calculation Method",
+        options=["Reed-Muench", "Spearman-Karber"],
+        horizontal=True,
+        help="Reed-Muench: Most common method. Spearman-Karber: Better for incomplete data"
+    )
     
-    # Placeholder for future implementation
-    st.markdown("""
-    **Features will include:**
-    - Reed-Muench method
-    - Spearman-Karber method
-    - Dynamic dilution series input
-    - TCID50 to PFU conversion
-    - Automated methods section generation
-    """)
+    # Input section
+    st.subheader("Dilution Series Data")
+    
+    # Number of dilutions
+    num_dilutions = st.number_input(
+        "Number of Dilutions Tested",
+        min_value=3,
+        max_value=10,
+        value=6,
+        step=1,
+        help="Minimum 3 dilutions required for accurate calculation",
+        key="tcid_num_dilutions"
+    )
+    
+    # Initialize session state for dilution data
+    if 'dilution_data' not in st.session_state:
+        st.session_state.dilution_data = []
+    
+    # Create dynamic input table
+    st.markdown("**Enter data for each dilution:**")
+    
+    # Table headers
+    col_h1, col_h2, col_h3, col_h4 = st.columns([2, 2, 2, 2])
+    with col_h1:
+        st.markdown("**Dilution**")
+    with col_h2:
+        st.markdown("**Positive Wells**")
+    with col_h3:
+        st.markdown("**Total Wells**")
+    with col_h4:
+        st.markdown("**% Positive**")
+    
+    # Store dilution data
+    dilution_data = []
+    
+    for i in range(num_dilutions):
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+        
+        with col1:
+            dilution_exp = st.selectbox(
+                f"Dilution {i+1}",
+                options=list(range(-1, -11, -1)),
+                index=i if i < 9 else 9,
+                format_func=lambda x: f"10^{x}",
+                key=f"tcid_dilution_{i}",
+                label_visibility="collapsed"
+            )
+        
+        with col2:
+            positive = st.number_input(
+                f"Positive {i+1}",
+                min_value=0,
+                max_value=100,
+                value=0,
+                step=1,
+                key=f"tcid_positive_{i}",
+                label_visibility="collapsed"
+            )
+        
+        with col3:
+            total = st.number_input(
+                f"Total {i+1}",
+                min_value=1,
+                max_value=100,
+                value=4,
+                step=1,
+                key=f"tcid_total_{i}",
+                label_visibility="collapsed"
+            )
+        
+        with col4:
+            if total > 0:
+                percent_positive = (positive / total) * 100
+                st.metric("", f"{percent_positive:.1f}%", label_visibility="collapsed")
+            else:
+                st.metric("", "0%", label_visibility="collapsed")
+        
+        dilution_data.append({
+            'dilution_exp': dilution_exp,
+            'dilution_factor': 10 ** abs(dilution_exp),
+            'positive': positive,
+            'total': total,
+            'percent': (positive / total * 100) if total > 0 else 0
+        })
+    
+    # Additional parameters
+    st.subheader("Experimental Parameters")
+    
+    col_param1, col_param2 = st.columns(2)
+    
+    with col_param1:
+        inoculum_volume = st.number_input(
+            "Inoculum Volume (µL)",
+            min_value=1.0,
+            value=100.0,
+            step=10.0,
+            help="Volume inoculated per well",
+            key="tcid_volume"
+        )
+    
+    with col_param2:
+        tcid_cell_line = st.selectbox(
+            "Cell Line",
+            options=["MDCK-DP", "Vero", "BHK-21", "A549", "HEK293", "HEP-2", "HeLa"],
+            index=0,
+            key="tcid_cell_line"
+        )
+    
+    # Calculate button
+    if st.button("Calculate TCID50", type="primary", key="tcid_calc_button"):
+        
+        # Validation
+        valid_data = True
+        error_messages = []
+        
+        # Check for valid data
+        if all(d['positive'] == 0 for d in dilution_data):
+            error_messages.append("All wells are negative. Cannot calculate TCID50.")
+            valid_data = False
+        
+        if all(d['positive'] == d['total'] for d in dilution_data):
+            error_messages.append("All wells are positive. Cannot calculate TCID50.")
+            valid_data = False
+        
+        # Check for at least one transition
+        has_transition = False
+        for i in range(len(dilution_data) - 1):
+            if dilution_data[i]['percent'] > 50 and dilution_data[i+1]['percent'] < 50:
+                has_transition = True
+                break
+        
+        if not has_transition and valid_data:
+            st.warning("⚠️ No clear 50% transition point detected. Results may be less reliable.")
+        
+        if not valid_data:
+            for msg in error_messages:
+                st.error(f"❌ {msg}")
+        else:
+            st.subheader("Results")
+            
+            # Reed-Muench Calculation
+            if calculation_method == "Reed-Muench":
+                # Find dilutions above and below 50%
+                above_50 = [d for d in dilution_data if d['percent'] >= 50]
+                below_50 = [d for d in dilution_data if d['percent'] < 50]
+                
+                if above_50 and below_50:
+                    # Get the dilution just above and just below 50%
+                    dilution_above = max(above_50, key=lambda x: x['dilution_exp'])
+                    dilution_below = min(below_50, key=lambda x: x['dilution_exp'])
+                    
+                    # Calculate proportionate distance
+                    percent_above = dilution_above['percent']
+                    percent_below = dilution_below['percent']
+                    
+                    proportionate_distance = (percent_above - 50) / (percent_above - percent_below)
+                    
+                    # Calculate TCID50 dilution
+                    log_dilution = dilution_above['dilution_exp'] + proportionate_distance
+                    tcid50_dilution_factor = 10 ** abs(log_dilution)
+                    
+                    # Calculate TCID50/mL
+                    volume_ml = inoculum_volume / 1000
+                    tcid50_per_ml = tcid50_dilution_factor / volume_ml
+                    
+                    # Display result
+                    exponent = int(math.floor(math.log10(tcid50_per_ml)))
+                    mantissa = tcid50_per_ml / (10 ** exponent)
+                    tcid50_display = f"{mantissa:.2f} × 10^{exponent} TCID50/mL"
+                    
+                    st.markdown(f"### TCID50 Titer")
+                    st.markdown(f"<h2 style='color: #006400; margin-top: -10px;'>{tcid50_display}</h2>", unsafe_allow_html=True)
+                    
+                    # PFU conversion
+                    pfu_equivalent = tcid50_per_ml * 0.7
+                    pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
+                    pfu_mant = pfu_equivalent / (10 ** pfu_exp)
+                    pfu_display = f"{pfu_mant:.2f} × 10^{pfu_exp} PFU/mL"
+                    
+                    st.info(f"📊 **Approximate PFU equivalent:** {pfu_display} (using 0.7 conversion factor)")
+                    
+                    # Calculation details
+                    with st.expander("📐 Calculation Details"):
+                        st.markdown(f"""
+                        **Reed-Muench Method:**
+                        
+                        - Dilution above 50%: 10^{dilution_above['dilution_exp']} ({percent_above:.1f}% positive)
+                        - Dilution below 50%: 10^{dilution_below['dilution_exp']} ({percent_below:.1f}% positive)
+                        - Proportionate Distance: ({percent_above:.1f} - 50) / ({percent_above:.1f} - {percent_below:.1f}) = {proportionate_distance:.4f}
+                        - Log10 TCID50 dilution: {dilution_above['dilution_exp']} + {proportionate_distance:.4f} = {log_dilution:.4f}
+                        - TCID50 dilution factor: 10^{abs(log_dilution):.4f} = {tcid50_dilution_factor:.2e}
+                        - TCID50/mL: {tcid50_dilution_factor:.2e} / {volume_ml} mL = {tcid50_per_ml:.2e}
+                        """)
+                    
+                    # Data table
+                    with st.expander("📊 Data Summary Table"):
+                        import pandas as pd
+                        df = pd.DataFrame([{
+                            'Dilution': f"10^{d['dilution_exp']}",
+                            'Positive': d['positive'],
+                            'Total': d['total'],
+                            '% Positive': f"{d['percent']:.1f}%"
+                        } for d in dilution_data])
+                        st.dataframe(df, use_container_width=True)
+                    
+                else:
+                    st.error("❌ Cannot calculate: No clear 50% endpoint detected")
+            
+            # Spearman-Karber Calculation
+            else:  # Spearman-Karber
+                # Sort by dilution (highest to lowest concentration)
+                sorted_data = sorted(dilution_data, key=lambda x: x['dilution_exp'], reverse=True)
+                
+                # Calculate proportions
+                proportions = [d['positive'] / d['total'] for d in sorted_data]
+                
+                # Calculate sum of proportions
+                sum_proportions = sum(proportions)
+                
+                # Get lowest dilution (highest concentration)
+                x0 = sorted_data[0]['dilution_exp']
+                
+                # Dilution factor (log spacing)
+                d = 1  # Assuming 10-fold dilutions
+                
+                # Spearman-Karber formula: TCID50 = 10^(x0 - d(S - 0.5))
+                log_tcid50 = x0 - d * (sum_proportions - 0.5)
+                
+                tcid50_dilution_factor = 10 ** abs(log_tcid50)
+                
+                # Calculate TCID50/mL
+                volume_ml = inoculum_volume / 1000
+                tcid50_per_ml = tcid50_dilution_factor / volume_ml
+                
+                # Display result
+                exponent = int(math.floor(math.log10(tcid50_per_ml)))
+                mantissa = tcid50_per_ml / (10 ** exponent)
+                tcid50_display = f"{mantissa:.2f} × 10^{exponent} TCID50/mL"
+                
+                st.markdown(f"### TCID50 Titer")
+                st.markdown(f"<h2 style='color: #006400; margin-top: -10px;'>{tcid50_display}</h2>", unsafe_allow_html=True)
+                
+                # PFU conversion
+                pfu_equivalent = tcid50_per_ml * 0.7
+                pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
+                pfu_mant = pfu_equivalent / (10 ** pfu_exp)
+                pfu_display = f"{pfu_mant:.2f} × 10^{pfu_exp} PFU/mL"
+                
+                st.info(f"📊 **Approximate PFU equivalent:** {pfu_display} (using 0.7 conversion factor)")
+                
+                # Calculation details
+                with st.expander("📐 Calculation Details"):
+                    st.markdown(f"""
+                    **Spearman-Karber Method:**
+                    
+                    - Lowest dilution (x₀): 10^{x0}
+                    - Dilution factor (d): {d}
+                    - Sum of proportions (S): {sum_proportions:.4f}
+                    - Log10 TCID50: {x0} - {d}×({sum_proportions:.4f} - 0.5) = {log_tcid50:.4f}
+                    - TCID50 dilution factor: 10^{abs(log_tcid50):.4f} = {tcid50_dilution_factor:.2e}
+                    - TCID50/mL: {tcid50_dilution_factor:.2e} / {volume_ml} mL = {tcid50_per_ml:.2e}
+                    """)
+                
+                # Data table
+                with st.expander("📊 Data Summary Table"):
+                    import pandas as pd
+                    df = pd.DataFrame([{
+                        'Dilution': f"10^{d['dilution_exp']}",
+                        'Positive': d['positive'],
+                        'Total': d['total'],
+                        'Proportion': f"{d['positive']/d['total']:.3f}",
+                        '% Positive': f"{d['percent']:.1f}%"
+                    } for d in sorted_data])
+                    st.dataframe(df, use_container_width=True)
+            
+            # Methods section
+            st.subheader("Methods Section")
+            
+            methods_text = f"""Viral titers were determined by TCID50 assay using the {calculation_method} method. {tcid_cell_line} cells were seeded in 96-well plates and incubated overnight to reach confluence. Serial 10-fold dilutions of virus stock were prepared, and {inoculum_volume:.0f} µL of each dilution was added to replicate wells ({dilution_data[0]['total']} wells per dilution). Plates were incubated at 37°C with 5% CO₂ and monitored daily for cytopathic effect (CPE). After appropriate incubation, wells were scored as positive (CPE present) or negative (no CPE). The TCID50 was calculated using the {calculation_method} method and expressed as {tcid50_display}."""
+            
+            st.text_area("Copy for your methods:", methods_text, height=150, key="tcid_methods_area")
+            
+            # Copy button
+            if st.button("📋 Copy Methods", key="tcid_copy_methods"):
+                st.code(methods_text, language=None)
+                st.success("✓ Select all (Ctrl+A) and copy (Ctrl+C)")
+    
+    # Example data button
+    st.markdown("---")
+    if st.button("📝 Load Example Data", key="tcid_example"):
+        st.info("""
+        **Example loaded!** Modify the values above to match your data.
+        
+        Example shows a typical influenza TCID50 assay with:
+        - 6 dilutions (10⁻² to 10⁻⁷)
+        - 4 wells per dilution
+        - Clear 50% endpoint around 10⁻⁵
+        """)
 
 # Footer
 st.markdown("---")
