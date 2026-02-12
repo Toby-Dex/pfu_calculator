@@ -11,7 +11,7 @@ from reportlab.lib.units import inch
 
 # Page config
 st.set_page_config(
-    page_title="Viral Titer Calculator",
+    page_title="Viral Titer Toolkit",
     page_icon="🦠",
     layout="centered"
 )
@@ -675,6 +675,12 @@ with tab3:
                     st.markdown(f"### TCID50 Titer")
                     st.markdown(f"<h2 style='color: #006400; margin-top: -10px;'>{tcid50_display}</h2>", unsafe_allow_html=True)
                     
+                    # PFU conversion (calculate first before saving to history)
+                    pfu_equivalent = tcid50_per_ml * 0.7
+                    pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
+                    pfu_mant = pfu_equivalent / (10 ** pfu_exp)
+                    pfu_display = f"{pfu_mant:.2f} × 10^{pfu_exp} PFU/mL"
+                    
                     # Save to calculation history
                     st.session_state.calculation_history.append({
                         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -684,12 +690,6 @@ with tab3:
                         'cell_line': tcid_cell_line,
                         'num_dilutions': num_dilutions
                     })
-                    
-                    # PFU conversion
-                    pfu_equivalent = tcid50_per_ml * 0.7
-                    pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
-                    pfu_mant = pfu_equivalent / (10 ** pfu_exp)
-                    pfu_display = f"{pfu_mant:.2f} × 10^{pfu_exp} PFU/mL"
                     
                     st.info(f"📊 **Approximate PFU equivalent:** {pfu_display} (using 0.7 conversion factor)")
                     
@@ -754,6 +754,12 @@ with tab3:
                 st.markdown(f"### TCID50 Titer")
                 st.markdown(f"<h2 style='color: #006400; margin-top: -10px;'>{tcid50_display}</h2>", unsafe_allow_html=True)
                 
+                # PFU conversion (calculate first before saving to history)
+                pfu_equivalent = tcid50_per_ml * 0.7
+                pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
+                pfu_mant = pfu_equivalent / (10 ** pfu_exp)
+                pfu_display = f"{pfu_mant:.2f} × 10^{pfu_exp} PFU/mL"
+                
                 # Save to calculation history
                 st.session_state.calculation_history.append({
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -763,12 +769,6 @@ with tab3:
                     'cell_line': tcid_cell_line,
                     'num_dilutions': num_dilutions
                 })
-                
-                # PFU conversion
-                pfu_equivalent = tcid50_per_ml * 0.7
-                pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
-                pfu_mant = pfu_equivalent / (10 ** pfu_exp)
-                pfu_display = f"{pfu_mant:.2f} × 10^{pfu_exp} PFU/mL"
                 
                 st.info(f"📊 **Approximate PFU equivalent:** {pfu_display} (using 0.7 conversion factor)")
                 
@@ -887,4 +887,4 @@ with tab3:
 
 # Footer
 st.markdown("---")
-st.markdown("*Developed for streamlining virology workflows | Created by Tobi Lawal*")
+st.markdown("*Developed for streamlining virology workflows*")
