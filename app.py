@@ -1,12 +1,96 @@
 import streamlit as st
 import math
+import pandas as pd
+from datetime import datetime
+import io
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 # Page config
 st.set_page_config(
-    page_title="Viral Titer Toolkit",
+    page_title="Viral Titer Calculator",
     page_icon="🦠",
     layout="centered"
 )
+
+# Initialize session state for calculation history
+if 'calculation_history' not in st.session_state:
+    st.session_state.calculation_history = []
+
+# Initialize dark mode state
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
+
+# Dark mode toggle in sidebar
+with st.sidebar:
+    st.markdown("### ⚙️ Settings")
+    dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode, key="dark_mode_toggle")
+    
+    if dark_mode != st.session_state.dark_mode:
+        st.session_state.dark_mode = dark_mode
+        st.rerun()
+    
+    # Apply dark mode CSS
+    if st.session_state.dark_mode:
+        st.markdown("""
+        <style>
+        .stApp {
+            background-color: #0E1117;
+            color: #FAFAFA;
+        }
+        .stTextInput > div > div > input,
+        .stSelectbox > div > div > div,
+        .stNumberInput > div > div > input {
+            background-color: #262730;
+            color: #FAFAFA;
+        }
+        .stMarkdown {
+            color: #FAFAFA;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Calculation History Section
+    st.markdown("### 📊 Calculation History")
+    
+    if len(st.session_state.calculation_history) > 0:
+        st.write(f"**Total Calculations:** {len(st.session_state.calculation_history)}")
+        
+        # Export history as CSV
+        if st.button("📥 Export History (CSV)", use_container_width=True):
+            # Create DataFrame from history
+            df = pd.DataFrame(st.session_state.calculation_history)
+            
+            # Convert to CSV
+            csv = df.to_csv(index=False)
+            
+            # Download button
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name=f"titer_calculations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        
+        # Clear history button
+        if st.button("🗑️ Clear History", use_container_width=True):
+            st.session_state.calculation_history = []
+            st.success("History cleared!")
+            st.rerun()
+        
+        # Show recent calculations
+        with st.expander("View Recent Calculations"):
+            recent = st.session_state.calculation_history[-5:][::-1]  # Last 5, reversed
+            for i, calc in enumerate(recent):
+                st.text(f"{i+1}. {calc.get('type', 'N/A')} - {calc.get('result', 'N/A')}")
+    else:
+        st.info("No calculations yet")
 
 # Title and description
 st.title("🦠 Viral Titer Calculator")
@@ -174,10 +258,94 @@ with tab1:
         st.markdown(f"### Viral Titer")
         st.markdown(f"<h2 style='color: #006400; margin-top: -10px;'>{titer_display}</h2>", unsafe_allow_html=True)
         
-        # Copy button for titer
-        if st.button("📋 Copy Titer", key="copy_titer"):
-            st.code(titer_display, language=None)
-            st.success("✓ Copied! Use Ctrl+C to copy from the box above")
+        # Save to calculation history
+        st.session_state.calculation_history.append({
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'type': 'PFU',
+            'plaques': plaques,
+            'dilution': f"10^-{exponent}",
+            'volume_ul': volume,
+            'result': titer_display,
+            'cell_line': cell_line,
+            'countability': 'Valid' if 30 <= plaques <= 300 else 'Warning'
+        })
+        
+        # Copy and Export buttons
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("📋 Copy Titer", key="copy_titer", use_container_width=True):
+                st.code(titer_display, language=None)
+                st.success("✓ Copy from box above")
+        
+        with col_btn2:
+            # Generate PDF report
+            pdf_buffer = io.BytesIO()
+            doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+            story = []
+            styles = getSampleStyleSheet()
+            
+            # Title
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                textColor=colors.HexColor('#006400'),
+                spaceAfter=30,
+            )
+            story.append(Paragraph("PFU Titer Calculation Report", title_style))
+            story.append(Spacer(1, 0.2*inch))
+            
+            # Results
+            story.append(Paragraph(f"<b>Viral Titer:</b> {titer_display}", styles['Normal']))
+            story.append(Spacer(1, 0.1*inch))
+            
+            # Input data table
+            data = [
+                ['Parameter', 'Value'],
+                ['Plaques Counted', str(plaques)],
+                ['Dilution Factor', f"10^-{exponent}"],
+                ['Volume Plated', f"{volume:.0f} µL"],
+                ['Cell Line', cell_line],
+                ['Incubation Time', f"{incubation_days} days"],
+                ['Replicates', str(replicates)],
+                ['Plate Type', plate_type],
+                ['Overlay', overlay_type]
+            ]
+            
+            table = Table(data, colWidths=[2.5*inch, 3*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            story.append(table)
+            story.append(Spacer(1, 0.3*inch))
+            
+            # Methods section
+            story.append(Paragraph("<b>Methods:</b>", styles['Heading2']))
+            story.append(Paragraph(methods_text, styles['Normal']))
+            
+            # Footer
+            story.append(Spacer(1, 0.5*inch))
+            story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Italic']))
+            
+            doc.build(story)
+            pdf_buffer.seek(0)
+            
+            st.download_button(
+                label="📄 Download PDF Report",
+                data=pdf_buffer,
+                file_name=f"PFU_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
         
         # Methods section
         st.subheader("Methods Section")
@@ -269,6 +437,16 @@ with tab2:
         # Calculate volume needed in mL
         volume_needed_ml = target_pfu / stock_titer_pfu_ml
         volume_needed_ul = volume_needed_ml * 1000
+        
+        # Save to calculation history
+        st.session_state.calculation_history.append({
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'type': 'Reverse/Dilution',
+            'stock_titer': f"{stock_titer_mantissa:.2f} × 10^{stock_titer_exponent}",
+            'target_pfu': f"{target_pfu_mantissa:.2f} × 10^{target_pfu_exponent}",
+            'result': f"{volume_needed_ul:.2f} µL",
+            'pipettable': 'Yes' if 1 <= volume_needed_ul <= 1000 else 'No'
+        })
         
         st.markdown("### 📋 Results")
         
@@ -497,6 +675,16 @@ with tab3:
                     st.markdown(f"### TCID50 Titer")
                     st.markdown(f"<h2 style='color: #006400; margin-top: -10px;'>{tcid50_display}</h2>", unsafe_allow_html=True)
                     
+                    # Save to calculation history
+                    st.session_state.calculation_history.append({
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'type': 'TCID50 (Reed-Muench)',
+                        'result': tcid50_display,
+                        'pfu_equivalent': pfu_display,
+                        'cell_line': tcid_cell_line,
+                        'num_dilutions': num_dilutions
+                    })
+                    
                     # PFU conversion
                     pfu_equivalent = tcid50_per_ml * 0.7
                     pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
@@ -566,6 +754,16 @@ with tab3:
                 st.markdown(f"### TCID50 Titer")
                 st.markdown(f"<h2 style='color: #006400; margin-top: -10px;'>{tcid50_display}</h2>", unsafe_allow_html=True)
                 
+                # Save to calculation history
+                st.session_state.calculation_history.append({
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'type': 'TCID50 (Spearman-Karber)',
+                    'result': tcid50_display,
+                    'pfu_equivalent': pfu_display,
+                    'cell_line': tcid_cell_line,
+                    'num_dilutions': num_dilutions
+                })
+                
                 # PFU conversion
                 pfu_equivalent = tcid50_per_ml * 0.7
                 pfu_exp = int(math.floor(math.log10(pfu_equivalent)))
@@ -606,10 +804,74 @@ with tab3:
             
             st.text_area("Copy for your methods:", methods_text, height=150, key="tcid_methods_area")
             
-            # Copy button
-            if st.button("📋 Copy Methods", key="tcid_copy_methods"):
-                st.code(methods_text, language=None)
-                st.success("✓ Select all (Ctrl+A) and copy (Ctrl+C)")
+            # Export buttons
+            col_tcid1, col_tcid2 = st.columns(2)
+            
+            with col_tcid1:
+                if st.button("📋 Copy Methods", key="tcid_copy_methods", use_container_width=True):
+                    st.code(methods_text, language=None)
+                    st.success("✓ Select all (Ctrl+A) and copy (Ctrl+C)")
+            
+            with col_tcid2:
+                # Generate TCID50 PDF
+                pdf_buffer = io.BytesIO()
+                doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+                story = []
+                styles = getSampleStyleSheet()
+                
+                title_style = ParagraphStyle(
+                    'CustomTitle',
+                    parent=styles['Heading1'],
+                    fontSize=24,
+                    textColor=colors.HexColor('#006400'),
+                    spaceAfter=30,
+                )
+                story.append(Paragraph(f"TCID50 Calculation Report ({calculation_method})", title_style))
+                story.append(Spacer(1, 0.2*inch))
+                
+                story.append(Paragraph(f"<b>TCID50 Titer:</b> {tcid50_display}", styles['Normal']))
+                story.append(Paragraph(f"<b>PFU Equivalent:</b> {pfu_display}", styles['Normal']))
+                story.append(Spacer(1, 0.2*inch))
+                
+                # Dilution data table
+                table_data = [['Dilution', 'Positive', 'Total', '% Positive']]
+                for d in dilution_data:
+                    table_data.append([
+                        f"10^{d['dilution_exp']}",
+                        str(d['positive']),
+                        str(d['total']),
+                        f"{d['percent']:.1f}%"
+                    ])
+                
+                table = Table(table_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige)
+                ]))
+                
+                story.append(table)
+                story.append(Spacer(1, 0.3*inch))
+                
+                story.append(Paragraph("<b>Methods:</b>", styles['Heading2']))
+                story.append(Paragraph(methods_text, styles['Normal']))
+                story.append(Spacer(1, 0.3*inch))
+                story.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Italic']))
+                
+                doc.build(story)
+                pdf_buffer.seek(0)
+                
+                st.download_button(
+                    label="📄 Download PDF Report",
+                    data=pdf_buffer,
+                    file_name=f"TCID50_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="tcid_pdf_download"
+                )
     
     # Example data button
     st.markdown("---")
