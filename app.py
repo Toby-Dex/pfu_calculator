@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 # Title and description
-st.title("🦠 Viral Titer Toolkit")
+st.title("🦠 Viral Titer Calculator")
 st.markdown("Professional calculators for virology research workflows")
 
 # Create tabs for different calculators
